@@ -161,6 +161,12 @@ HCURSOR CSonyCameraDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+
+
+
+
+
+//搜寻设备的子线程函数
 DWORD WINAPI search(LPVOID param)
 {
 	CSonyCameraDlg *dlg = (CSonyCameraDlg*)param;
@@ -173,6 +179,8 @@ DWORD WINAPI search(LPVOID param)
 	return -1;
 }
 
+
+//使用ssdp协议搜寻设备
 void CSonyCameraDlg::OnBnClickedBtnconn()
 {
 	m_btnenter.EnableWindow(0);
@@ -180,15 +188,17 @@ void CSonyCameraDlg::OnBnClickedBtnconn()
 	CreateThread(0, 0, search, this, 0, 0);
 }
 
+
+//点击进入按钮
 void CSonyCameraDlg::OnBnClickedBtnenter()
 {
-	// TODO:  在此添加控件通知处理程序代码
+	//将device对象传递到dlg里面
 	CLiveview dlg(&device);
 	dlg.DoModal();
 }
 
 
-
+//自定义的找到设备处理函数
 afx_msg LRESULT CSonyCameraDlg::OnCmFind(WPARAM wParam, LPARAM lParam)
 {
 	//解析描述文件xml
@@ -196,6 +206,7 @@ afx_msg LRESULT CSonyCameraDlg::OnCmFind(WPARAM wParam, LPARAM lParam)
 	doc.Parse(ssdpClient.xml.GetBuffer(), 0, TIXML_ENCODING_UTF8);
 	doc.SaveFile("desc.xml");
 
+	//根据相机文档里说明的设备描述xml文件格式 提取设备服务地址
 	TiXmlElement *root = doc.RootElement();
 	if (!root)
 	{
@@ -247,7 +258,7 @@ FAIL:
 	return -1;
 }
 
-
+//自定义的未找到设备处理函数
 afx_msg LRESULT CSonyCameraDlg::OnCmDefind(WPARAM wParam, LPARAM lParam)
 {
 	m_DESCURL.SetWindowTextA("");

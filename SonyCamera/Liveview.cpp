@@ -5,6 +5,8 @@
 #include "SonyCamera.h"
 #include "SonyCameraDlg.h"
 #include "Liveview.h"
+#include "rapidjson\stringbuffer.h"
+#include "rapidjson\writer.h"
 #include "afxdialogex.h"
 
 
@@ -34,6 +36,8 @@ void CLiveview::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_STATUS, mStatus);
 	DDX_Control(pDX, IDC_BTNZOOMIN, mBtnZoomIn);
 	DDX_Control(pDX, IDC_BTNZOOMOUT, mBtnZoomOut);
+	DDX_Control(pDX, IDC_COMBO2, mIsoCombo);
+	DDX_Control(pDX, IDC_COMBO3, mExpoCombo);
 }
 
 
@@ -47,6 +51,8 @@ BEGIN_MESSAGE_MAP(CLiveview, CDialogEx)
 	ON_BN_CLICKED(IDC_BTNZOOMOUT, &CLiveview::OnBnClickedBtnzoomout)
 	ON_CBN_SELCHANGE(IDC_COMBO1, &CLiveview::OnCbnSelchangeCombo1)
 	ON_WM_CLOSE()
+	ON_CBN_SELCHANGE(IDC_COMBO2, &CLiveview::OnCbnSelchangeCombo2)
+	ON_CBN_SELCHANGE(IDC_COMBO3, &CLiveview::OnCbnSelchangeCombo3)
 END_MESSAGE_MAP()
 
 
@@ -58,6 +64,8 @@ void CLiveview::OnPaint()
 	CPaintDC dc(this); // device context for painting
 	// TODO:  在此处添加消息处理程序代码
 	// 不为绘图消息调用 CDialogEx::OnPaint()
+
+	//开启liveview
 	start();
 }
 
@@ -68,6 +76,8 @@ int CLiveview::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		return -1;
 
 	// TODO:  在此添加您专用的创建代码
+
+	//初始化设备  获取可用接口信息
 	Document replyJson;
 	replyJson = indevice->getApplicationInfo();
 
@@ -81,6 +91,7 @@ int CLiveview::OnCreate(LPCREATESTRUCT lpCreateStruct)
 }
 
 
+//根据设备状态更新界面
 void CLiveview::FreshUI()
 {
 	if (!fetching)
@@ -122,6 +133,7 @@ void CLiveview::FreshUI()
 }
 
 
+
 void CLiveview::start()
 {
 	Document replyJson;
@@ -134,10 +146,7 @@ void CLiveview::start()
 		indevice->loadAvailableCameraApiList(replyJson);
 	}
 
-	//此处应该开始相机事件监听
-
-
-	//开始liveview
+	//开始liveview  开两个子线程   一个获取图片  一个画出来
 	if (indevice->isCameraApiAvailable("startLiveview")) {
 		CreateThread(0, 0, retrieveJPG, this, 0, 0);
 		CreateThread(0, 0, drawJPEG, this, 0, 0);
@@ -159,6 +168,42 @@ void CLiveview::start()
 		mComMod.SelectString(0, indevice->curShootMode);
 	}
 
+	//获取支持的ISO
+	mIsoCombo.ResetContent();
+	const Document replyJson3 = indevice->getAvailableIsoSpeedRate();
+	if (indevice->isJsonOk(replyJson3))
+	{
+		CString curIso = replyJson3["result"].GetArray()[0].GetString();
+		Value::ConstArray a = replyJson3["result"].GetArray()[1].GetArray();
+		for (Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+		{
+			mIsoCombo.AddString(itr->GetString());
+		}
+		mIsoCombo.SelectString(0, curIso);
+	}
+
+
+	//获取支持的曝光模式
+	mExpoCombo.ResetContent();
+	const Document replyJson4 = indevice->getAvailableExposureMode();
+	if (indevice->isJsonOk(replyJson4))
+	{
+		CString curExpo = replyJson4["result"].GetArray()[0].GetString();
+		Value::ConstArray a = replyJson4["result"].GetArray()[1].GetArray();
+		for (Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+		{
+			mExpoCombo.AddString(itr->GetString());
+		}
+		mExpoCombo.SelectString(0, curExpo);
+	}
+
+
+
+	indevice->getAvailableStillSize();
+    indevice->setStillSize();
+	indevice->setPostviewImageSize();
+
+
 	//获取是否支持调节焦距
 	if (!indevice->isCameraApiAvailable("actZoom"))
 	{
@@ -170,6 +215,7 @@ void CLiveview::start()
 }
 
 
+//从HGLOBAL数据结构解码得到jpg对象
 IPicture *getPicFromHGlobal(HGLOBAL global)
 {
 	IStream *pStm = NULL;
@@ -190,7 +236,7 @@ IPicture *getPicFromHGlobal(HGLOBAL global)
 
 }
 
-
+//获取jpg数据
 DWORD WINAPI retrieveJPG(LPVOID param)
 {
 	CLiveview *dlg = (CLiveview *)param;
@@ -233,11 +279,20 @@ DWORD WINAPI retrieveJPG(LPVOID param)
 			break;
 		}
 		HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, size);
-		LPVOID pData = GlobalLock(hGlobal);
-		slicer.file->Read(pData, size);
+		PUCHAR pData = (PUCHAR)GlobalLock(hGlobal);
+		int readLen = 0;
+		while (readLen < size)
+		{
+			readLen += slicer.file->Read(pData + readLen, size - readLen);
+		}
 		GlobalUnlock(hGlobal);
 		payload.paddingData = new UCHAR[payload.paddingDataSize];
-		slicer.file->Read(payload.paddingData, payload.paddingDataSize);
+		readLen = 0;
+		while (readLen < payload.paddingDataSize)
+		{
+			readLen += slicer.file->Read(payload.paddingData + readLen,
+				payload.paddingDataSize - readLen);
+		}
 		delete[] payload.paddingData;
 
 		while (dlg->mJpegQueue.size() >= 5)
@@ -258,7 +313,7 @@ DWORD WINAPI retrieveJPG(LPVOID param)
 	return -1;
 }
 
-
+//将jpg数据显示到界面
 DWORD WINAPI drawJPEG(LPVOID param)
 {
 	CLiveview *dlg = (CLiveview *)param;
@@ -296,6 +351,7 @@ DWORD WINAPI drawJPEG(LPVOID param)
 
 
 
+//停止获取liveview
 void CLiveview::OnBnClickedBtnstop()
 {
 	if (fetching)
@@ -311,11 +367,17 @@ void CLiveview::OnBnClickedBtnstop()
 }
 
 
+
+
+//拍摄照片按钮
 void CLiveview::OnBnClickedBtnpic()
 {
-	Document d = indevice->actTakePicture();
+	Document d;
+	//发送拍照请求
+	d = indevice->actTakePicture();
 	if (indevice->isJsonOk(d))
 	{
+		//请求成功就解析照片地址  继续获取
 		CString pictureurl = d["result"].GetArray()[0].GetArray()[0].GetString();
 		ULONG size = 0;
 		PUCHAR picture = HttpClient::getData(pictureurl, size);
@@ -323,6 +385,14 @@ void CLiveview::OnBnClickedBtnpic()
 		{
 			return;
 		}
+		//将图片数据存储为文件
+		FILE *file = fopen("d:\\picture.jpg", "wb");
+		if (file)
+		{
+			fwrite(picture, size, 1, file);
+			fclose(file);
+		}
+		//将获取的数据解码为照片并显示
 		HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, size);
 		LPVOID pData = GlobalLock(hGlobal);
 		memcpy(pData, picture, size);
@@ -332,6 +402,8 @@ void CLiveview::OnBnClickedBtnpic()
 
 		if (pPic == NULL)
 			return;
+
+
 
 		OLE_XSIZE_HIMETRIC hmWidth;
 		OLE_YSIZE_HIMETRIC hmHeight;
@@ -348,7 +420,7 @@ void CLiveview::OnBnClickedBtnpic()
 	}
 }
 
-
+//录制视频按钮
 void CLiveview::OnBnClickedBtnrec()
 {
 	if (!indevice->recording)
@@ -364,7 +436,7 @@ void CLiveview::OnBnClickedBtnrec()
 	FreshUI();
 }
 
-
+//改变焦距zoomin
 void CLiveview::OnBnClickedBtnzoomin()
 {
 	Document d = indevice->actZoom("in", "1shot");
@@ -374,7 +446,7 @@ void CLiveview::OnBnClickedBtnzoomin()
 	}
 }
 
-
+//改变焦距zoomout
 void CLiveview::OnBnClickedBtnzoomout()
 {
 	Document d = indevice->actZoom("out", "1shot");
@@ -385,9 +457,9 @@ void CLiveview::OnBnClickedBtnzoomout()
 }
 
 
+//改变拍摄模式
 void CLiveview::OnCbnSelchangeCombo1()
 {
-	// TODO:  在此添加控件通知处理程序代码
 	int nIndex = mComMod.GetCurSel();
 	CString selmode;
 	mComMod.GetLBText(nIndex, selmode);
@@ -409,10 +481,49 @@ void CLiveview::OnCbnSelchangeCombo1()
 	}
 }
 
+//设置ISO
+void CLiveview::OnCbnSelchangeCombo2()
+{
+	int nIndex = mIsoCombo.GetCurSel();
+	CString sel;
+	mIsoCombo.GetLBText(nIndex, sel);
+	Document d = indevice->setIsoSpeedRate(sel);
+	if (indevice->isJsonOk(d))
+	{
+		int a = 0;
+	}
+}
 
+
+//设置曝光模式
+void CLiveview::OnCbnSelchangeCombo3()
+{
+	int nIndex = mExpoCombo.GetCurSel();
+	CString sel;
+	mExpoCombo.GetLBText(nIndex, sel);
+	Document d = indevice->setExposureMode(sel);
+	if (indevice->isJsonOk(d))
+	{
+		//获取支持的ISO
+		mIsoCombo.ResetContent();
+		const Document replyJson3 = indevice->getAvailableIsoSpeedRate();
+		if (indevice->isJsonOk(replyJson3))
+		{
+			CString curIso = replyJson3["result"].GetArray()[0].GetString();
+			Value::ConstArray a = replyJson3["result"].GetArray()[1].GetArray();
+			for (Value::ConstValueIterator itr = a.Begin(); itr != a.End(); ++itr)
+			{
+				mIsoCombo.AddString(itr->GetString());
+			}
+			mIsoCombo.SelectString(0, curIso);
+		}
+	}
+}
+
+
+//关闭对话框的时候停止liveview
 void CLiveview::OnClose()
 {
-	// TODO:  在此添加消息处理程序代码和/或调用默认值
 	if (fetching)
 	{
 		fetching = false;
@@ -420,3 +531,9 @@ void CLiveview::OnClose()
 	}
 	CDialogEx::OnClose();
 }
+
+
+
+
+
+

@@ -1,7 +1,8 @@
+
 #include "stdafx.h"
 #include "utils.h"
 
-
+//使用get方法获取文本信息
 CString HttpClient::get(CString url, int timeout)
 {
 	CInternetSession session;
@@ -26,7 +27,7 @@ CString HttpClient::get(CString url, int timeout)
 	return result;
 }
 
-
+//使用get方法获取二进制信息
 PUCHAR HttpClient::getData(CString url, ULONG &size, int timeout)
 {
 	CInternetSession session;
@@ -64,7 +65,7 @@ PUCHAR HttpClient::getData(CString url, ULONG &size, int timeout)
 }
 
 
-
+//将httpfile对象传递出来  供liveview类使用
 void HttpClient::getFile(CString url, CInternetSession **session, CHttpFile **file, int timeout)
 {
 	 *session = new CInternetSession();
@@ -72,7 +73,7 @@ void HttpClient::getFile(CString url, CInternetSession **session, CHttpFile **fi
 	*file = (CHttpFile *)(*session)->OpenURL(url);
 }
 
-
+//使用post方法传输文本信息 如使用json发送命令到相机
 CString HttpClient::post(CString url, CString data, int timeout)
 {
 	if (url.Find("http://") >= 0)

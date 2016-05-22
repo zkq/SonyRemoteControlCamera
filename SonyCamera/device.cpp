@@ -4,7 +4,7 @@
 #include "rapidjson\stringbuffer.h"
 #include "rapidjson\writer.h"
 
-
+//将可用api保存到mAvailableCameraApiSet
 void Device::loadAvailableCameraApiList(const Document &replyJson)
 {
 	mAvailableCameraApiSet.clear();
@@ -23,7 +23,7 @@ void Device::loadAvailableCameraApiList(const Document &replyJson)
 	}
 }
 
-
+//将支持api保存到mSupportedApiSet
 void Device::loadSupportedApiList(const Document &replyJson)
 {
 	mSupportedApiSet.clear();
@@ -43,14 +43,14 @@ void Device::loadSupportedApiList(const Document &replyJson)
 
 
 
-
+//检查给定的api是否可用
 bool Device::isCameraApiAvailable(const CString &apiName)
 {
 	auto a = mAvailableCameraApiSet.find(apiName);
 
 	return a != mAvailableCameraApiSet.end();
 }
-
+//检查给定的api是否支持
 boolean Device::isApiSupported(const CString &apiName)
 {
 	auto a = mSupportedApiSet.find(apiName);
@@ -60,6 +60,7 @@ boolean Device::isApiSupported(const CString &apiName)
 
 
 
+//获取指定服务名称的操作地址
 CString Device::findActionListUrl(CString service)
 {
 	for (auto ite = services.begin(); ite != services.end(); ite++)
@@ -72,6 +73,7 @@ CString Device::findActionListUrl(CString service)
 	return NULL;
 }
 
+//发送json命令的基础函数
 Document Device::sendApi(CString &type, Value &method, Value &params, Value &version)
 {
 	CString actionurl = findActionListUrl(type);
@@ -107,7 +109,7 @@ Document Device::sendApi(CString &type, Value &method, Value &params, Value &ver
 }
 
 
-//***********************************API Impletation*****************************
+//***********************************设备命令实现*****************************
 Document Device::getApplicationInfo()
 {
 	CString type = "camera";
@@ -223,19 +225,13 @@ Document Device::actZoom(CString direction, CString movement)
 
 	Value params;
 	params.SetArray();
-	//枚举direction
-	if (direction == "in")
-	params.PushBack("in", d.GetAllocator());
-	if (direction == "out")
-		params.PushBack("out", d.GetAllocator());
-
-	//枚举movement
-	if (movement == "1shot")
-	params.PushBack("1shot", d.GetAllocator());
-	if (movement == "start")
-		params.PushBack("start", d.GetAllocator());
-	if (movement == "stop")
-		params.PushBack("stop", d.GetAllocator());
+	//direction
+	Value s;
+	s.SetString(direction, d.GetAllocator());
+	params.PushBack(s, d.GetAllocator());
+	//movement
+	s.SetString(movement, d.GetAllocator());
+	params.PushBack(s, d.GetAllocator());
 
 	Value version;
 	version = "1.0";
@@ -243,6 +239,54 @@ Document Device::actZoom(CString direction, CString movement)
 }
 
 
+Document Device::getAvailableStillSize()
+{
+	Document d;
+	CString type = "camera";
+	Value method;
+	method = "getAvailableStillSize";
+	Value params;
+	params.SetArray();
+
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+}
+
+
+
+
+Document Device::setStillSize()
+{
+	Document d;
+	CString type = "camera";
+	Value method;
+	method = "setStillSize";
+	Value params;
+	params.SetArray();
+	params.PushBack("4:3", d.GetAllocator());
+	params.PushBack("5M", d.GetAllocator());
+
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+}
+
+
+Document Device::setPostviewImageSize(){
+	Document d;
+	CString type = "camera";
+	Value method;
+	method = "setPostviewImageSize";
+	Value params;
+	params.SetArray();
+	params.PushBack("Original", d.GetAllocator());
+
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+
+}
 
 Document Device::actTakePicture()
 {
@@ -277,6 +321,69 @@ Document Device::stopMovieRec()
 	method = "stopMovieRec";
 	Value params;
 	params.SetArray();
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+}
+
+
+//ISO
+Document Device::getAvailableIsoSpeedRate()
+{
+	CString type = "camera";
+	Value method;
+	method = "getAvailableIsoSpeedRate";
+	Value params;
+	params.SetArray();
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+}
+
+
+Document Device::setIsoSpeedRate(CString rate)
+{
+	Document d;
+	CString type = "camera";
+	Value method;
+	method = "setIsoSpeedRate";
+	Value params;
+	params.SetArray();
+	Value s;
+	s.SetString(rate, d.GetAllocator());
+	params.PushBack(s, d.GetAllocator());
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+
+}
+
+
+//曝光
+Document Device::getAvailableExposureMode()
+{
+	CString type = "camera";
+	Value method;
+	method = "getAvailableExposureMode";
+	Value params;
+	params.SetArray();
+	Value version;
+	version = "1.0";
+	return sendApi(type, method, params, version);
+}
+
+
+Document Device::setExposureMode(CString mode)
+{
+	Document d;
+	CString type = "camera";
+	Value method;
+	method = "setExposureMode";
+	Value params;
+	params.SetArray();
+	Value s;
+	s.SetString(mode, d.GetAllocator());
+	params.PushBack(s, d.GetAllocator());
 	Value version;
 	version = "1.0";
 	return sendApi(type, method, params, version);

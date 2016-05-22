@@ -29,8 +29,9 @@ protected:
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
 public:
-	
+	//ssdp协议对象
 	SsdpClient ssdpClient;
+	//连接的设备对象
 	Device device;
 
 	CStatic m_DESCURL;

@@ -51,6 +51,10 @@ public:
 	CStatic mStatus;
 	CButton mBtnZoomIn;
 	CButton mBtnZoomOut;
+	CComboBox mIsoCombo;
+	afx_msg void OnCbnSelchangeCombo2();
+	CComboBox mExpoCombo;
+	afx_msg void OnCbnSelchangeCombo3();
 };
 
 DWORD WINAPI retrieveJPG(LPVOID param);
